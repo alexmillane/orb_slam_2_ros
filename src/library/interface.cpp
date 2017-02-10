@@ -20,6 +20,7 @@ OrbSlam2Interface::OrbSlam2Interface(const ros::NodeHandle& nh,
                                      const ros::NodeHandle& nh_private)
     : nh_(nh),
       nh_private_(nh_private),
+      use_viewer_(kDefaultUseViewer),
       verbose_(kDefaultVerbose),
       frame_id_(kDefaultFrameId),
       child_frame_id_(kDefaultChildFrameId),
@@ -97,6 +98,7 @@ void OrbSlam2Interface::getParametersFromRos() {
   CHECK(nh_private_.getParam("settings_file_path", settings_file_path_))
       << "Please provide the settings_file_path as a ros param.";
   // Optional params
+  nh_private_.getParam("use_viewer", use_viewer_);
   nh_private_.getParam("verbose", verbose_);
   nh_private_.getParam("frame_id", frame_id_);
   nh_private_.getParam("child_frame_id", child_frame_id_);
