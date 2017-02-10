@@ -18,6 +18,7 @@
 namespace orb_slam_2_interface {
 
 // Default values for parameters
+static const bool kDefaultUseViewer = true;
 static const bool kDefaultVerbose = true;
 static const std::string kDefaultFrameId = "world";
 static const std::string kDefaultChildFrameId = "cam0";
@@ -74,6 +75,7 @@ class OrbSlam2Interface {
   Transformation T_W_C_;
 
   // Parameters
+  bool use_viewer_;
   bool verbose_;
   std::string vocabulary_file_path_;
   std::string settings_file_path_;
