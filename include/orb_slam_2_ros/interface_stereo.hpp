@@ -35,7 +35,8 @@ class OrbSlam2InterfaceStereo : public OrbSlam2Interface {
 
   // Performs tracking given the current frames
   void performTracking(cv_bridge::CvImageConstPtr cv_ptr_left,
-                       cv_bridge::CvImageConstPtr cv_ptr_right);
+                       cv_bridge::CvImageConstPtr cv_ptr_right,
+                       bool* keyframe_flag);
 
   // Convert frames from msgs to OpenCV format
   void convertFrames(const sensor_msgs::ImageConstPtr& msg_left,

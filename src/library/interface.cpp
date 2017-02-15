@@ -11,7 +11,8 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/core/eigen.hpp>
 
-#include "orb_slam_2_ros/TransformStampedArray.h"
+#include "orb_slam_2_ros/KeyframeStatus.h"
+#include "orb_slam_2_ros/TransformsWithIds.h"
 #include "orb_slam_2_ros/interface.hpp"
 
 namespace orb_slam_2_interface {
@@ -50,30 +51,29 @@ void OrbSlam2Interface::runPublishUpdatedTrajectory() {
       // DEBUG
       std::cout << "Updated trajectory available. Publishing." << std::endl;
       // Getting the trajectory from the interface
-      std::vector<std::pair<cv::Mat, double>> T_C_W_trajectory_unnormalized =
-          slam_system_->GetUpdatedTrajectory();
+      std::vector<ORB_SLAM2::PoseWithID>
+          T_C_W_trajectory_unnormalized = slam_system_->GetUpdatedTrajectory();
       // Populating the trajectory message
-      orb_slam_2_ros::TransformStampedArray transform_stamped_array_msg;
-      for (auto i_T_C_W_stamped_cv = T_C_W_trajectory_unnormalized.begin();
-           i_T_C_W_stamped_cv != T_C_W_trajectory_unnormalized.end();
-           i_T_C_W_stamped_cv++) {
+      orb_slam_2_ros::TransformsWithIds transforms_with_ids;
+      for (const ORB_SLAM2::PoseWithID& pose_with_id : T_C_W_trajectory_unnormalized) {
         // Converting to minkindr
         Transformation T_C_W;
-        convertOrbSlamPoseToKindr(i_T_C_W_stamped_cv->first, &T_C_W);
+        convertOrbSlamPoseToKindr(pose_with_id.pose, &T_C_W);
         // Inverting for the proper direction
         Transformation T_W_C = T_C_W.inverse();
-        // Converting to a pose message
-        geometry_msgs::Pose T_W_C_msg;
-        tf::poseKindrToMsg(T_W_C, &T_W_C_msg);
         // Converting to a transform stamped message
-        geometry_msgs::TransformStamped T_W_C_msg_2;
-        T_W_C_msg_2.header.stamp = ros::Time(i_T_C_W_stamped_cv->second);
-        tf::transformKindrToMsg(T_W_C, &T_W_C_msg_2.transform);
+        geometry_msgs::TransformStamped T_W_C_msg;
+        T_W_C_msg.header.stamp = ros::Time(pose_with_id.timestamp);
+        tf::transformKindrToMsg(T_W_C, &T_W_C_msg.transform);
+        // Converting the id to a message
+        std_msgs::UInt64 id;
+        id.data = pose_with_id.id;
         // Pushing this onto the transform stamped array
-        transform_stamped_array_msg.transforms.push_back(T_W_C_msg_2);
+        transforms_with_ids.transforms.push_back(T_W_C_msg);
+        transforms_with_ids.keyframe_ids.push_back(id);
       }
       // Publishing the trajectory message
-      trajectory_pub_.publish(transform_stamped_array_msg);
+      trajectory_pub_.publish(transforms_with_ids);
     }
     usleep(5000);
   }
@@ -84,10 +84,12 @@ void OrbSlam2Interface::advertiseTopics() {
   T_pub_ = nh_private_.advertise<geometry_msgs::TransformStamped>(
       "transform_cam", 1);
   trajectory_pub_ =
-      nh_private_.advertise<orb_slam_2_ros::TransformStampedArray>(
+      nh_private_.advertise<orb_slam_2_ros::TransformsWithIds>(
           "trajectory_cam", 1);
+  keyframe_status_pub_ = nh_private_.advertise<orb_slam_2_ros::KeyframeStatus>(
+      "keyframe_status", 1);
   // Creating a callback timer for TF publisher
-  tf_timer_ = nh_.createTimer(ros::Duration(0.01),
+  tf_timer_ = nh_.createTimer(ros::Duration(0.1),
                               &OrbSlam2Interface::publishCurrentPoseAsTF, this);
 }
 
@@ -126,7 +128,7 @@ void OrbSlam2Interface::publishCurrentPoseAsTF(const ros::TimerEvent& event) {
       tf_transform, ros::Time::now(), frame_id_, child_frame_id_));
 }
 
-void OrbSlam2Interface::publishTrajectory(
+/*void OrbSlam2Interface::publishTrajectory(
     const std::vector<Eigen::Affine3d,
                       Eigen::aligned_allocator<Eigen::Affine3d>>&
         T_C_W_trajectory) {
@@ -145,7 +147,7 @@ void OrbSlam2Interface::publishTrajectory(
   }
   // Publishing
   trajectory_pub_.publish(pose_array_msg);
-}
+}*/
 
 void OrbSlam2Interface::convertOrbSlamPoseToKindr(const cv::Mat& T_cv,
                                                   Transformation* T_kindr) {
@@ -166,6 +168,18 @@ void OrbSlam2Interface::convertOrbSlamPoseToKindr(const cv::Mat& T_cv,
   Quaternion q_kindr(R);
   Eigen::Vector3d t_kindr(T_eigen_d.block<3, 1>(0, 3));
   *T_kindr = Transformation(q_kindr, t_kindr);
+}
+
+void OrbSlam2Interface::publishCurrentKeyframeStatus(
+    bool keyframe_status, long unsigned int last_keyframe_id,
+    const std_msgs::Header& frame_header) {
+  //
+  orb_slam_2_ros::KeyframeStatus keyframe_status_msg;
+  keyframe_status_msg.status = keyframe_status;
+  keyframe_status_msg.header.stamp = frame_header.stamp;
+  keyframe_status_msg.keyframe_id.data = last_keyframe_id;
+  // Publishing
+  keyframe_status_pub_.publish(keyframe_status_msg);
 }
 
 }  // namespace orb_slam_2_interface

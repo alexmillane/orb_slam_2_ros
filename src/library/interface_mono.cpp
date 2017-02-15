@@ -33,8 +33,9 @@ void OrbSlam2InterfaceMono::imageCallback(const sensor_msgs::ImageConstPtr& msg)
     return;
   }
   // Handing the image to ORB slam for tracking
-  cv::Mat T_C_W_opencv =
-      slam_system_->TrackMonocular(cv_ptr->image, cv_ptr->header.stamp.toSec());
+  bool keyframe_flag;
+  cv::Mat T_C_W_opencv = slam_system_->TrackMonocular(
+      cv_ptr->image, cv_ptr->header.stamp.toSec(), &keyframe_flag);
   // If tracking successfull
   if (!T_C_W_opencv.empty()) {
     // Converting to kindr transform and publishing

@@ -8,8 +8,10 @@
 
 #include <geometry_msgs/TransformStamped.h>
 #include <orb_slam_2/System.h>
+//#include <orb_slam_2/DenseMappingInterface.h>
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
+#include <std_msgs/Header.h>
 #include <tf/transform_broadcaster.h>
 #include <Eigen/Geometry>
 
@@ -47,7 +49,9 @@ class OrbSlam2Interface {
   void publishCurrentPose(const Transformation& T,
                           const std_msgs::Header& header);
   void publishCurrentPoseAsTF(const ros::TimerEvent& event);
-  void publishTrajectory(const std::vector<Eigen::Affine3d, Eigen::aligned_allocator<Eigen::Affine3d> >& trajectory);
+  void publishCurrentKeyframeStatus(bool keyframe_status,
+                                    long unsigned int last_keyframe_id,
+                                    const std_msgs::Header& frame_header);
 
   // Helper functions
   void convertOrbSlamPoseToKindr(const cv::Mat& T_cv, Transformation* T_kindr);
@@ -64,6 +68,7 @@ class OrbSlam2Interface {
   tf::TransformBroadcaster tf_broadcaster_;
   ros::Timer tf_timer_;
   ros::Publisher trajectory_pub_;
+  ros::Publisher keyframe_status_pub_;
 
   // Pointer to the thread that checks for and publishes loop closures
   std::thread* mpt_loop_closure_publisher;
