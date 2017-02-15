@@ -128,27 +128,6 @@ void OrbSlam2Interface::publishCurrentPoseAsTF(const ros::TimerEvent& event) {
       tf_transform, ros::Time::now(), frame_id_, child_frame_id_));
 }
 
-/*void OrbSlam2Interface::publishTrajectory(
-    const std::vector<Eigen::Affine3d,
-                      Eigen::aligned_allocator<Eigen::Affine3d>>&
-        T_C_W_trajectory) {
-  // Populating the pose array
-  geometry_msgs::PoseArray pose_array_msg;
-  for (size_t pose_index = 0; pose_index < T_C_W_trajectory.size();
-       pose_index++) {
-    Eigen::Affine3d T_C_W = T_C_W_trajectory[pose_index];
-    // TODO(alexmillane): This is the wrong place for the inverse. Move it to
-    // the extraction function... Also rename the publisher. Gotta go to bed
-    // right now.
-    Eigen::Affine3d T_W_C = T_C_W.inverse();
-    geometry_msgs::Pose pose_msg;
-    tf::poseEigenToMsg(T_W_C, pose_msg);
-    pose_array_msg.poses.push_back(pose_msg);
-  }
-  // Publishing
-  trajectory_pub_.publish(pose_array_msg);
-}*/
-
 void OrbSlam2Interface::convertOrbSlamPoseToKindr(const cv::Mat& T_cv,
                                                   Transformation* T_kindr) {
   // Argument checks
@@ -172,12 +151,13 @@ void OrbSlam2Interface::convertOrbSlamPoseToKindr(const cv::Mat& T_cv,
 
 void OrbSlam2Interface::publishCurrentKeyframeStatus(
     bool keyframe_status, long unsigned int last_keyframe_id,
-    const std_msgs::Header& frame_header) {
+    bool big_change_flag, const std_msgs::Header& frame_header) {
   //
   orb_slam_2_ros::KeyframeStatus keyframe_status_msg;
-  keyframe_status_msg.status = keyframe_status;
+  keyframe_status_msg.keyframe_status = keyframe_status;
   keyframe_status_msg.header.stamp = frame_header.stamp;
   keyframe_status_msg.keyframe_id.data = last_keyframe_id;
+  keyframe_status_msg.big_change_status = big_change_flag;
   // Publishing
   keyframe_status_pub_.publish(keyframe_status_msg);
 }

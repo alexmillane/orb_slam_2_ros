@@ -44,21 +44,23 @@ void OrbSlam2InterfaceStereo::stereoImageCallback(
   convertFrames(msg_left, msg_right, cv_ptr_left, cv_ptr_right);
   // Performing tracking using the frames
   bool keyframe_flag;
-  performTracking(cv_ptr_left, cv_ptr_right, &keyframe_flag);
+  bool big_change_flag;
+  performTracking(cv_ptr_left, cv_ptr_right, &keyframe_flag, &big_change_flag);
   // Getting the current keyframe ID
   long unsigned int last_keyframe_id = slam_system_->getLastKeyFrameID();
   // Publishing results
   publishCurrentPose(T_W_C_, msg_left->header);
-  publishCurrentKeyframeStatus(keyframe_flag, last_keyframe_id, msg_left->header);
+  publishCurrentKeyframeStatus(keyframe_flag, last_keyframe_id, big_change_flag, msg_left->header);
 }
 
 void OrbSlam2InterfaceStereo::performTracking(
     const cv_bridge::CvImageConstPtr cv_ptr_left,
-    const cv_bridge::CvImageConstPtr cv_ptr_right, bool* keyframe_flag) {
+    const cv_bridge::CvImageConstPtr cv_ptr_right, bool* keyframe_flag,
+    bool* big_change_flag) {
   // Handing the image to ORB slam for tracking
   cv::Mat T_C_W_opencv = slam_system_->TrackStereo(
       cv_ptr_left->image, cv_ptr_right->image,
-      cv_ptr_left->header.stamp.toSec(), keyframe_flag);
+      cv_ptr_left->header.stamp.toSec(), keyframe_flag, big_change_flag);
   // If tracking successfull
   if (!T_C_W_opencv.empty()) {
     // Converting to kindr transform and publishing

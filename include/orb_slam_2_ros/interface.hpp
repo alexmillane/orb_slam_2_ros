@@ -51,6 +51,7 @@ class OrbSlam2Interface {
   void publishCurrentPoseAsTF(const ros::TimerEvent& event);
   void publishCurrentKeyframeStatus(bool keyframe_status,
                                     long unsigned int last_keyframe_id,
+                                    bool big_change_flag,
                                     const std_msgs::Header& frame_header);
 
   // Helper functions

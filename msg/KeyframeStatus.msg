@@ -1,3 +1,4 @@
 std_msgs/Header header
 std_msgs/UInt64 keyframe_id
-bool status
+bool keyframe_status
+bool big_change_status
