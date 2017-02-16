@@ -15,9 +15,9 @@
   <buildtool_depend>catkin_simple</buildtool_depend>
   <buildtool_depend>message_generation</buildtool_depend>
 
-  <build_depend>message_generation</build_depend>
+<!--   <build_depend>message_generation</build_depend>
   <build_depend>geometry_msgs</build_depend>
-  <build_depend>std_msgs</build_depend>
+  <build_depend>std_msgs</build_depend> -->
 
 
   <!-- Dependencies. -->
