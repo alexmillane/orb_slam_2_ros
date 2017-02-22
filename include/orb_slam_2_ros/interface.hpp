@@ -2,16 +2,18 @@
 #define ORB_SLAM_2_INTERFACE
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
-#include <mutex>
 
 #include <geometry_msgs/TransformStamped.h>
 #include <orb_slam_2/System.h>
+#include <orb_slam_2/Optimizer.h>
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
 #include <tf/transform_broadcaster.h>
 #include <Eigen/Geometry>
+#include <Eigen/Sparse>
 
 #include "orb_slam_2_ros/types.hpp"
 
@@ -47,13 +49,23 @@ class OrbSlam2Interface {
   void publishCurrentPose(const Transformation& T,
                           const std_msgs::Header& header);
   void publishCurrentPoseAsTF(const ros::TimerEvent& event);
-  void publishTrajectory(const std::vector<Eigen::Affine3d, Eigen::aligned_allocator<Eigen::Affine3d> >& trajectory);
+  void publishTrajectory(
+      const std::vector<Eigen::Affine3d,
+                        Eigen::aligned_allocator<Eigen::Affine3d> >&
+          trajectory);
 
   // Helper functions
   void convertOrbSlamPoseToKindr(const cv::Mat& T_cv, Transformation* T_kindr);
 
-  // Contains a while loop that checks for updates to the past trajectories and then publishes them
+  // Contains a while loop that checks for updates to the past trajectories and
+  // then publishes them
   void runPublishUpdatedTrajectory();
+
+  bool getMarginalUncertainty(long unsigned int id,
+                              Eigen::Matrix<double, 6, 6>* cov);
+  bool getJointMarginalUncertainty(long unsigned int id_x,
+                                   long unsigned int id_y,
+                                   Eigen::Matrix<double, 6, 6>* cov);
 
   // Node handles
   ros::NodeHandle nh_;
@@ -73,6 +85,10 @@ class OrbSlam2Interface {
 
   // The current pose
   Transformation T_W_C_;
+
+  std::vector<long unsigned int> idx_to_id_;
+  std::map<long unsigned int, size_t> id_to_idx_;
+  Eigen::MatrixXd cov_mat_;
 
   // Parameters
   bool use_viewer_;

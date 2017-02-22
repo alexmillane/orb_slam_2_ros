@@ -74,6 +74,29 @@ void OrbSlam2Interface::runPublishUpdatedTrajectory() {
       }
       // Publishing the trajectory message
       trajectory_pub_.publish(transform_stamped_array_msg);
+
+      // Getting info needed for covariance calculation
+      std::shared_ptr<std::pair<std::vector<long unsigned int>,
+                                Eigen::SparseMatrix<double, Eigen::ColMajor>>>
+          cov_info = ORB_SLAM2::Optimizer::getCovInfo();
+
+      // lets you go from keyframe id to index and vice-versa
+      idx_to_id_ = cov_info->first;
+      for (size_t i = 0; i < idx_to_id_.size(); ++i) {
+        id_to_idx_[idx_to_id_[i]] = i;
+      }
+
+      std::cout << "beginning covariance calculation..." << std::endl;
+      // build up covariance matrix (invert by solving AtA * _covMatrix = I)
+      // THIS IS A MASSIVE INEFFICIENT HACK THAT WILL CRIPPLE YOUR RUNTIME
+      Eigen::SimplicialLLT<Eigen::SparseMatrix<double, Eigen::ColMajor>> solver;
+      solver.compute(cov_info->second);
+      Eigen::SparseMatrix<double, Eigen::ColMajor> I(cov_info->second.rows(),
+                                                     cov_info->second.cols());
+      I.setIdentity();
+      Eigen::SparseMatrix<double, Eigen::ColMajor> solution = solver.solve(I);
+      cov_mat_ = solution;
+      std::cout << "finished covariance calculation" << std::endl;
     }
     usleep(5000);
   }
@@ -166,6 +189,43 @@ void OrbSlam2Interface::convertOrbSlamPoseToKindr(const cv::Mat& T_cv,
   Quaternion q_kindr(R);
   Eigen::Vector3d t_kindr(T_eigen_d.block<3, 1>(0, 3));
   *T_kindr = Transformation(q_kindr, t_kindr);
+}
+
+bool OrbSlam2Interface::getMarginalUncertainty(
+    long unsigned int id, Eigen::Matrix<double, 6, 6>* cov) {
+  if (id_to_idx_.find(id) == id_to_idx_.end()) {
+    return false;
+  }
+  size_t idx = id_to_idx_[id];
+
+  // get elements
+  *cov = cov_mat_.block(idx * 6, idx * 6, 6, 6);
+
+  return true;
+}
+
+bool OrbSlam2Interface::getJointMarginalUncertainty(
+    long unsigned int id_x, long unsigned id_y,
+    Eigen::Matrix<double, 6, 6>* cov) {
+  if (id_to_idx_.find(id_x) == id_to_idx_.end()) {
+    return false;
+  }
+  size_t idx_x = id_to_idx_[id_x];
+
+  if (id_to_idx_.find(id_y) == id_to_idx_.end()) {
+    return false;
+  }
+  size_t idx_y = id_to_idx_[id_y];
+
+  // get parts of shur matrix
+  Eigen::Matrix<double, 6, 6> A = cov_mat_.block(idx_x * 6, idx_x * 6, 6, 6);
+  Eigen::Matrix<double, 6, 6> B = cov_mat_.block(idx_x * 6, idx_y * 6, 6, 6);
+  Eigen::Matrix<double, 6, 6> C = cov_mat_.block(idx_y * 6, idx_y * 6, 6, 6);
+
+  // get covariance
+  *cov = A - B * C.inverse() * B.transpose();
+
+  return true;
 }
 
 }  // namespace orb_slam_2_interface
