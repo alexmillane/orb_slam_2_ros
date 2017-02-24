@@ -11,6 +11,8 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/core/eigen.hpp>
 
+#include <Eigen/Sparse>
+
 #include "orb_slam_2_ros/TransformStampedArray.h"
 #include "orb_slam_2_ros/interface.hpp"
 
@@ -74,6 +76,32 @@ void OrbSlam2Interface::runPublishUpdatedTrajectory() {
       }
       // Publishing the trajectory message
       trajectory_pub_.publish(transform_stamped_array_msg);
+
+      // calculating the covaraince
+      std::cout << "Calculating the covariance matrix, this will take awhile..."
+                << std::endl;
+      std::shared_ptr<std::pair<std::vector<size_t>,
+                                Eigen::SparseMatrix<double, Eigen::ColMajor>>>
+          cov_info = ORB_SLAM2::Optimizer::getCovInfo();
+      
+      idxToId_ = cov_info->first;
+      idToIdx_.clear();
+      for(size_t i = 0; i < idxToId_.size(); ++i){
+        idToIdx_[idxToId_[i]] = i;
+      }
+
+
+      // build up covariance matrix (invert by solving AtA * _covMatrix = I)
+      // THIS IS A MASSIVE INEFFICIENT HACK THAT WILL CRIPPLE YOUR RUNTIME
+      Eigen::SimplicialLLT<Eigen::SparseMatrix<double, Eigen::ColMajor>>
+          llt_solver;
+      llt_solver.compute(cov_info->second);
+      Eigen::SparseMatrix<double, Eigen::ColMajor> I(cov_info->second.rows(),
+                                                     cov_info->second.cols());
+      I.setIdentity();
+      Eigen::SparseMatrix<double, Eigen::ColMajor> solution =
+          llt_solver.solve(I);
+      cov_mat_ = solution;
     }
     usleep(5000);
   }
@@ -132,9 +160,9 @@ void OrbSlam2Interface::publishTrajectory(
         T_C_W_trajectory) {
   // Populating the pose array
   geometry_msgs::PoseArray pose_array_msg;
-  for (size_t pose_index = 0; pose_index < T_C_W_trajectory.size();
-       pose_index++) {
-    Eigen::Affine3d T_C_W = T_C_W_trajectory[pose_index];
+  for (size_t pose_idx = 0; pose_idx < T_C_W_trajectory.size();
+       pose_idx++) {
+    Eigen::Affine3d T_C_W = T_C_W_trajectory[pose_idx];
     // TODO(alexmillane): This is the wrong place for the inverse. Move it to
     // the extraction function... Also rename the publisher. Gotta go to bed
     // right now.
@@ -166,6 +194,44 @@ void OrbSlam2Interface::convertOrbSlamPoseToKindr(const cv::Mat& T_cv,
   Quaternion q_kindr(R);
   Eigen::Vector3d t_kindr(T_eigen_d.block<3, 1>(0, 3));
   *T_kindr = Transformation(q_kindr, t_kindr);
+}
+
+bool OrbSlam2Interface::getMarginalUncertainty(int id,
+                                                     Eigen::MatrixXd* cov) {
+  if (idToIdx_.find(id) == idToIdx_.end()) {
+    return false;
+  }
+  int idx = idToIdx_[id];
+
+  // get elements
+  *cov = cov_mat_.block(idx * 6, idx * 6, 6, 6);
+
+  return true;
+}
+
+// I have no idea if this is correct, a straight implementation of this
+// wikipedia page (https://en.wikipedia.org/wiki/Schur_complement)
+bool OrbSlam2Interface::getJointMarginalUncertainty(
+    int id_x, int id_y, Eigen::MatrixXd* cov) {
+  if (idToIdx_.find(id_x) == idToIdx_.end()) {
+    return false;
+  }
+  int idx_x = idToIdx_[id_x];
+
+  if (idToIdx_.find(id_y) == idToIdx_.end()) {
+    return false;
+  }
+  int idx_y = idToIdx_[id_y];
+
+  // get parts of shur matrix
+  Eigen::Matrix<double, 6, 6> A = cov_mat_.block(idx_x * 6, idx_x * 6, 6, 6);
+  Eigen::Matrix<double, 6, 6> B = cov_mat_.block(idx_x * 6, idx_y * 6, 6, 6);
+  Eigen::Matrix<double, 6, 6> C = cov_mat_.block(idx_y * 6, idx_y * 6, 6, 6);
+
+  // get covariance
+  *cov = A - B * C.inverse() * B.transpose();
+
+  return true;
 }
 
 }  // namespace orb_slam_2_interface
