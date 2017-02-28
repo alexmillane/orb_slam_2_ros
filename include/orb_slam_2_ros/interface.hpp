@@ -2,11 +2,12 @@
 #define ORB_SLAM_2_INTERFACE
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
-#include <mutex>
 
 #include <geometry_msgs/TransformStamped.h>
+#include <orb_slam_2/Optimizer.h>
 #include <orb_slam_2/System.h>
 //#include <orb_slam_2/DenseMappingInterface.h>
 #include <ros/ros.h>
@@ -49,16 +50,26 @@ class OrbSlam2Interface {
   void publishCurrentPose(const Transformation& T,
                           const std_msgs::Header& header);
   void publishCurrentPoseAsTF(const ros::TimerEvent& event);
+
   void publishCurrentKeyframeStatus(bool keyframe_status,
                                     long unsigned int last_keyframe_id,
                                     bool big_change_flag,
                                     const std_msgs::Header& frame_header);
 
+  void publishTrajectory(
+      const std::vector<Eigen::Affine3d,
+                        Eigen::aligned_allocator<Eigen::Affine3d> >&
+          trajectory);
+
   // Helper functions
   void convertOrbSlamPoseToKindr(const cv::Mat& T_cv, Transformation* T_kindr);
 
-  // Contains a while loop that checks for updates to the past trajectories and then publishes them
+  // Contains a while loop that checks for updates to the past trajectories and
+  // then publishes them
   void runPublishUpdatedTrajectory();
+
+  bool getMarginalUncertainty(int id, Eigen::MatrixXd* cov);
+  bool getJointMarginalUncertainty(int id_x, int id_y, Eigen::MatrixXd* cov);
 
   // Node handles
   ros::NodeHandle nh_;
@@ -79,6 +90,13 @@ class OrbSlam2Interface {
 
   // The current pose
   Transformation T_W_C_;
+
+  // which keyframe id goes with each row of covariance matrix
+  std::vector<long unsigned int> idxToId_;
+  std::map<long unsigned int, size_t> idToIdx_;
+
+  // The current covariance matrix
+  Eigen::MatrixXd cov_mat_;
 
   // Parameters
   bool use_viewer_;
