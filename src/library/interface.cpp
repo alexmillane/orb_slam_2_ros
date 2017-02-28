@@ -53,12 +53,51 @@ void OrbSlam2Interface::runPublishUpdatedTrajectory() {
     // Check if updates to the past trajectory are available
     if (slam_system_->isUpdatedTrajectoryAvailable()) {
       // DEBUG
+
+      // calculating the covaraince
+      std::cout << "Calculating the covariance matrix, this will take awhile..."
+                << std::endl;
+      std::shared_ptr<std::pair<std::vector<size_t>,
+                                Eigen::SparseMatrix<double, Eigen::ColMajor>>>
+          cov_info = ORB_SLAM2::Optimizer::getCovInfo();
+
+      // build up covariance matrix (invert by solving AtA * _covMatrix = I)
+      // THIS IS A MASSIVE INEFFICIENT HACK THAT WILL CRIPPLE YOUR RUNTIME
+      Eigen::SimplicialLLT<Eigen::SparseMatrix<double, Eigen::ColMajor>>
+          llt_solver;
+      llt_solver.compute(cov_info->second);
+      Eigen::SparseMatrix<double, Eigen::ColMajor> I(cov_info->second.rows(),
+                                                     cov_info->second.cols());
+      I.setIdentity();
+      Eigen::SparseMatrix<double, Eigen::ColMajor> solution =
+          llt_solver.solve(I);
+      cov_mat_ = solution;
+
+      orb_slam_2_ros::TransformsWithIds transforms_with_ids;
+
+      for (unsigned int id_raw : cov_info->first) {
+        std_msgs::UInt64 id;
+        id.data = id_raw;
+        transforms_with_ids.idx_to_ids.push_back(id);
+      }
+
+      // Writing the covariance matrix
+      transforms_with_ids.covariance.layout.dim.push_back(std_msgs::MultiArrayDimension());
+      transforms_with_ids.covariance.layout.dim[0].size = cov_mat_.cols();
+      transforms_with_ids.covariance.layout.dim[0].stride = cov_mat_.size();
+      transforms_with_ids.covariance.layout.dim[0].label = "cov_x";
+      transforms_with_ids.covariance.layout.dim.push_back(std_msgs::MultiArrayDimension());
+      transforms_with_ids.covariance.layout.dim[1].size = cov_mat_.rows();
+      transforms_with_ids.covariance.layout.dim[1].stride = 1;
+      transforms_with_ids.covariance.layout.dim[1].label = "cov_y";
+      transforms_with_ids.covariance.data = std::vector<double>(
+          cov_mat_.data(), cov_mat_.data() + cov_mat_.size());
+
       std::cout << "Updated trajectory available. Publishing." << std::endl;
       // Getting the trajectory from the interface
       std::vector<ORB_SLAM2::PoseWithID> T_C_W_trajectory_unnormalized =
           slam_system_->GetUpdatedTrajectory();
       // Populating the trajectory message
-      orb_slam_2_ros::TransformsWithIds transforms_with_ids;
       for (const ORB_SLAM2::PoseWithID& pose_with_id :
            T_C_W_trajectory_unnormalized) {
         // Converting to minkindr
@@ -79,32 +118,6 @@ void OrbSlam2Interface::runPublishUpdatedTrajectory() {
       }
       // Publishing the trajectory message
       trajectory_pub_.publish(transforms_with_ids);
-      trajectory_pub_.publish(transform_stamped_array_msg);
-
-      // calculating the covaraince
-      std::cout << "Calculating the covariance matrix, this will take awhile..."
-                << std::endl;
-      std::shared_ptr<std::pair<std::vector<size_t>,
-                                Eigen::SparseMatrix<double, Eigen::ColMajor>>>
-          cov_info = ORB_SLAM2::Optimizer::getCovInfo();
-
-      idxToId_ = cov_info->first;
-      idToIdx_.clear();
-      for (size_t i = 0; i < idxToId_.size(); ++i) {
-        idToIdx_[idxToId_[i]] = i;
-      }
-
-      // build up covariance matrix (invert by solving AtA * _covMatrix = I)
-      // THIS IS A MASSIVE INEFFICIENT HACK THAT WILL CRIPPLE YOUR RUNTIME
-      Eigen::SimplicialLLT<Eigen::SparseMatrix<double, Eigen::ColMajor>>
-          llt_solver;
-      llt_solver.compute(cov_info->second);
-      Eigen::SparseMatrix<double, Eigen::ColMajor> I(cov_info->second.rows(),
-                                                     cov_info->second.cols());
-      I.setIdentity();
-      Eigen::SparseMatrix<double, Eigen::ColMajor> solution =
-          llt_solver.solve(I);
-      cov_mat_ = solution;
     }
     usleep(5000);
   }
@@ -210,43 +223,6 @@ void OrbSlam2Interface::publishCurrentKeyframeStatus(
   keyframe_status_msg.big_change_status = big_change_flag;
   // Publishing
   keyframe_status_pub_.publish(keyframe_status_msg);
-}
-
-bool OrbSlam2Interface::getMarginalUncertainty(int id, Eigen::MatrixXd* cov) {
-  if (idToIdx_.find(id) == idToIdx_.end()) {
-    return false;
-  }
-  int idx = idToIdx_[id];
-
-  // get elements
-  *cov = cov_mat_.block(idx * 6, idx * 6, 6, 6);
-
-  return true;
-}
-
-// I have no idea if this is correct, a straight implementation of this
-// wikipedia page (https://en.wikipedia.org/wiki/Schur_complement)
-bool OrbSlam2Interface::getJointMarginalUncertainty(int id_x, int id_y,
-                                                    Eigen::MatrixXd* cov) {
-  if (idToIdx_.find(id_x) == idToIdx_.end()) {
-    return false;
-  }
-  int idx_x = idToIdx_[id_x];
-
-  if (idToIdx_.find(id_y) == idToIdx_.end()) {
-    return false;
-  }
-  int idx_y = idToIdx_[id_y];
-
-  // get parts of shur matrix
-  Eigen::Matrix<double, 6, 6> A = cov_mat_.block(idx_x * 6, idx_x * 6, 6, 6);
-  Eigen::Matrix<double, 6, 6> B = cov_mat_.block(idx_x * 6, idx_y * 6, 6, 6);
-  Eigen::Matrix<double, 6, 6> C = cov_mat_.block(idx_y * 6, idx_y * 6, 6, 6);
-
-  // get covariance
-  *cov = A - B * C.inverse() * B.transpose();
-
-  return true;
 }
 
 }  // namespace orb_slam_2_interface

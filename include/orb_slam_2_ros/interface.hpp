@@ -68,9 +68,6 @@ class OrbSlam2Interface {
   // then publishes them
   void runPublishUpdatedTrajectory();
 
-  bool getMarginalUncertainty(int id, Eigen::MatrixXd* cov);
-  bool getJointMarginalUncertainty(int id_x, int id_y, Eigen::MatrixXd* cov);
-
   // Node handles
   ros::NodeHandle nh_;
   ros::NodeHandle nh_private_;
@@ -90,10 +87,6 @@ class OrbSlam2Interface {
 
   // The current pose
   Transformation T_W_C_;
-
-  // which keyframe id goes with each row of covariance matrix
-  std::vector<long unsigned int> idxToId_;
-  std::map<long unsigned int, size_t> idToIdx_;
 
   // The current covariance matrix
   Eigen::MatrixXd cov_mat_;
