@@ -11,7 +11,6 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/core/eigen.hpp>
 
-
 #include "orb_slam_2_ros/KeyframeStatus.h"
 #include "orb_slam_2_ros/TransformsWithIds.h"
 
@@ -56,11 +55,12 @@ void OrbSlam2Interface::runPublishUpdatedTrajectory() {
       // DEBUG
       std::cout << "Updated trajectory available. Publishing." << std::endl;
       // Getting the trajectory from the interface
-      std::vector<ORB_SLAM2::PoseWithID>
-          T_C_W_trajectory_unnormalized = slam_system_->GetUpdatedTrajectory();
+      std::vector<ORB_SLAM2::PoseWithID> T_C_W_trajectory_unnormalized =
+          slam_system_->GetUpdatedTrajectory();
       // Populating the trajectory message
       orb_slam_2_ros::TransformsWithIds transforms_with_ids;
-      for (const ORB_SLAM2::PoseWithID& pose_with_id : T_C_W_trajectory_unnormalized) {
+      for (const ORB_SLAM2::PoseWithID& pose_with_id :
+           T_C_W_trajectory_unnormalized) {
         // Converting to minkindr
         Transformation T_C_W;
         convertOrbSlamPoseToKindr(pose_with_id.pose, &T_C_W);
@@ -78,9 +78,7 @@ void OrbSlam2Interface::runPublishUpdatedTrajectory() {
         transforms_with_ids.keyframe_ids.push_back(id);
       }
       // Publishing the trajectory message
-<<<<<<< HEAD
       trajectory_pub_.publish(transforms_with_ids);
-=======
       trajectory_pub_.publish(transform_stamped_array_msg);
 
       // calculating the covaraince
@@ -89,13 +87,12 @@ void OrbSlam2Interface::runPublishUpdatedTrajectory() {
       std::shared_ptr<std::pair<std::vector<size_t>,
                                 Eigen::SparseMatrix<double, Eigen::ColMajor>>>
           cov_info = ORB_SLAM2::Optimizer::getCovInfo();
-      
+
       idxToId_ = cov_info->first;
       idToIdx_.clear();
-      for(size_t i = 0; i < idxToId_.size(); ++i){
+      for (size_t i = 0; i < idxToId_.size(); ++i) {
         idToIdx_[idxToId_[i]] = i;
       }
-
 
       // build up covariance matrix (invert by solving AtA * _covMatrix = I)
       // THIS IS A MASSIVE INEFFICIENT HACK THAT WILL CRIPPLE YOUR RUNTIME
@@ -108,7 +105,6 @@ void OrbSlam2Interface::runPublishUpdatedTrajectory() {
       Eigen::SparseMatrix<double, Eigen::ColMajor> solution =
           llt_solver.solve(I);
       cov_mat_ = solution;
->>>>>>> origin/feature/uncertainty_tested
     }
     usleep(5000);
   }
@@ -118,9 +114,8 @@ void OrbSlam2Interface::advertiseTopics() {
   // Advertising topics
   T_pub_ = nh_private_.advertise<geometry_msgs::TransformStamped>(
       "transform_cam", 1);
-  trajectory_pub_ =
-      nh_private_.advertise<orb_slam_2_ros::TransformsWithIds>(
-          "trajectory_cam", 1);
+  trajectory_pub_ = nh_private_.advertise<orb_slam_2_ros::TransformsWithIds>(
+      "trajectory_cam", 1);
   keyframe_status_pub_ = nh_private_.advertise<orb_slam_2_ros::KeyframeStatus>(
       "keyframe_status", 1);
   // Creating a callback timer for TF publisher
@@ -163,16 +158,13 @@ void OrbSlam2Interface::publishCurrentPoseAsTF(const ros::TimerEvent& event) {
       tf_transform, ros::Time::now(), frame_id_, child_frame_id_));
 }
 
-<<<<<<< HEAD
-=======
 void OrbSlam2Interface::publishTrajectory(
     const std::vector<Eigen::Affine3d,
                       Eigen::aligned_allocator<Eigen::Affine3d>>&
         T_C_W_trajectory) {
   // Populating the pose array
   geometry_msgs::PoseArray pose_array_msg;
-  for (size_t pose_idx = 0; pose_idx < T_C_W_trajectory.size();
-       pose_idx++) {
+  for (size_t pose_idx = 0; pose_idx < T_C_W_trajectory.size(); pose_idx++) {
     Eigen::Affine3d T_C_W = T_C_W_trajectory[pose_idx];
     // TODO(alexmillane): This is the wrong place for the inverse. Move it to
     // the extraction function... Also rename the publisher. Gotta go to bed
@@ -186,7 +178,6 @@ void OrbSlam2Interface::publishTrajectory(
   trajectory_pub_.publish(pose_array_msg);
 }
 
->>>>>>> origin/feature/uncertainty_tested
 void OrbSlam2Interface::convertOrbSlamPoseToKindr(const cv::Mat& T_cv,
                                                   Transformation* T_kindr) {
   // Argument checks
@@ -208,7 +199,6 @@ void OrbSlam2Interface::convertOrbSlamPoseToKindr(const cv::Mat& T_cv,
   *T_kindr = Transformation(q_kindr, t_kindr);
 }
 
-<<<<<<< HEAD
 void OrbSlam2Interface::publishCurrentKeyframeStatus(
     bool keyframe_status, long unsigned int last_keyframe_id,
     bool big_change_flag, const std_msgs::Header& frame_header) {
@@ -220,9 +210,9 @@ void OrbSlam2Interface::publishCurrentKeyframeStatus(
   keyframe_status_msg.big_change_status = big_change_flag;
   // Publishing
   keyframe_status_pub_.publish(keyframe_status_msg);
-=======
-bool OrbSlam2Interface::getMarginalUncertainty(int id,
-                                                     Eigen::MatrixXd* cov) {
+}
+
+bool OrbSlam2Interface::getMarginalUncertainty(int id, Eigen::MatrixXd* cov) {
   if (idToIdx_.find(id) == idToIdx_.end()) {
     return false;
   }
@@ -236,8 +226,8 @@ bool OrbSlam2Interface::getMarginalUncertainty(int id,
 
 // I have no idea if this is correct, a straight implementation of this
 // wikipedia page (https://en.wikipedia.org/wiki/Schur_complement)
-bool OrbSlam2Interface::getJointMarginalUncertainty(
-    int id_x, int id_y, Eigen::MatrixXd* cov) {
+bool OrbSlam2Interface::getJointMarginalUncertainty(int id_x, int id_y,
+                                                    Eigen::MatrixXd* cov) {
   if (idToIdx_.find(id_x) == idToIdx_.end()) {
     return false;
   }
@@ -257,7 +247,6 @@ bool OrbSlam2Interface::getJointMarginalUncertainty(
   *cov = A - B * C.inverse() * B.transpose();
 
   return true;
->>>>>>> origin/feature/uncertainty_tested
 }
 
 }  // namespace orb_slam_2_interface
