@@ -16,7 +16,7 @@
 
 #include <Eigen/Sparse>
 
-#include "orb_slam_2_ros/TransformStampedArray.h"
+#include "orb_slam_2_ros/TransformsWithIds.h"
 #include "orb_slam_2_ros/interface.hpp"
 
 namespace orb_slam_2_interface {
@@ -79,9 +79,11 @@ void OrbSlam2Interface::runPublishUpdatedTrajectory() {
       }
       // Publishing the trajectory message
       trajectory_pub_.publish(transforms_with_ids);
-      trajectory_pub_.publish(transform_stamped_array_msg);
 
-      // calculating the covaraince
+      // BELOW IS ZACH'S STUFF ON CALCULATING THE MARGINAL COVARIANCE.
+      // THIS NEEDS MORE WORK.
+
+/*      // calculating the covaraince
       std::cout << "Calculating the covariance matrix, this will take awhile..."
                 << std::endl;
       std::shared_ptr<std::pair<std::vector<size_t>,
@@ -104,7 +106,8 @@ void OrbSlam2Interface::runPublishUpdatedTrajectory() {
       I.setIdentity();
       Eigen::SparseMatrix<double, Eigen::ColMajor> solution =
           llt_solver.solve(I);
-      cov_mat_ = solution;
+      cov_mat_ = solution;*/
+
     }
     usleep(5000);
   }
