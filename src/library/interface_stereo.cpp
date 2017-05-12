@@ -15,7 +15,7 @@ OrbSlam2InterfaceStereo::OrbSlam2InterfaceStereo(
                             ORB_SLAM2::System::STEREO, use_viewer_));
   // Starting thread to publish loop closure trajectories
   mpt_loop_closure_publisher =
-      new thread(&OrbSlam2InterfaceStereo::runPublishUpdatedTrajectory, this);
+      new thread(&OrbSlam2InterfaceStereo::runCheckForUpdatedTrajectory, this);
 }
 
 void OrbSlam2InterfaceStereo::subscribeToTopics() {

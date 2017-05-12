@@ -45,7 +45,7 @@ void OrbSlam2Interface::shutdown() {
   }
 }
 
-void OrbSlam2Interface::runPublishUpdatedTrajectory() {
+void OrbSlam2Interface::runCheckForUpdatedTrajectory() {
   // Looping while the interface is alive and checking for loop closures
   // TODO(alexmillane): Should be using condition variables really instead of
   // this polled waiting structure.
@@ -54,31 +54,19 @@ void OrbSlam2Interface::runPublishUpdatedTrajectory() {
     if (slam_system_->isUpdatedTrajectoryAvailable()) {
       // DEBUG
       std::cout << "Updated trajectory available. Publishing." << std::endl;
+
+
+      // TODO(alex.millane): Put the below in a function!!!
+      // TODO(alex.millane): Include a timestamp!!!
+
+
       // Getting the trajectory from the interface
       std::vector<ORB_SLAM2::PoseWithID> T_C_W_trajectory_unnormalized =
           slam_system_->GetUpdatedTrajectory();
-      // Populating the trajectory message
-      orb_slam_2_ros::TransformsWithIds transforms_with_ids;
-      for (const ORB_SLAM2::PoseWithID& pose_with_id :
-           T_C_W_trajectory_unnormalized) {
-        // Converting to minkindr
-        Transformation T_C_W;
-        convertOrbSlamPoseToKindr(pose_with_id.pose, &T_C_W);
-        // Inverting for the proper direction
-        Transformation T_W_C = T_C_W.inverse();
-        // Converting to a transform stamped message
-        geometry_msgs::TransformStamped T_W_C_msg;
-        T_W_C_msg.header.stamp = ros::Time(pose_with_id.timestamp);
-        tf::transformKindrToMsg(T_W_C, &T_W_C_msg.transform);
-        // Converting the id to a message
-        std_msgs::UInt64 id;
-        id.data = pose_with_id.id;
-        // Pushing this onto the transform stamped array
-        transforms_with_ids.transforms.push_back(T_W_C_msg);
-        transforms_with_ids.keyframe_ids.push_back(id);
-      }
-      // Publishing the trajectory message
-      trajectory_pub_.publish(transforms_with_ids);
+
+      // Publishing the trajectory
+      publishUpdatedTrajectory(T_C_W_trajectory_unnormalized);
+
 
       // BELOW IS ZACH'S STUFF ON CALCULATING THE MARGINAL COVARIANCE.
       // THIS NEEDS MORE WORK.
@@ -111,6 +99,35 @@ void OrbSlam2Interface::runPublishUpdatedTrajectory() {
     }
     usleep(5000);
   }
+}
+
+void OrbSlam2Interface::publishUpdatedTrajectory(
+    const std::vector<ORB_SLAM2::PoseWithID>& T_C_W_trajectory) {
+  // Populating the trajectory message
+  orb_slam_2_ros::TransformsWithIds transforms_with_ids;
+  for (const ORB_SLAM2::PoseWithID& pose_with_id : T_C_W_trajectory) {
+    // Converting to minkindr
+    Transformation T_C_W;
+    convertOrbSlamPoseToKindr(pose_with_id.pose, &T_C_W);
+    // Inverting for the proper direction
+    Transformation T_W_C = T_C_W.inverse();
+    // Converting to a transform stamped message
+    geometry_msgs::TransformStamped T_W_C_msg;
+    T_W_C_msg.header.stamp = ros::Time(pose_with_id.timestamp);
+    tf::transformKindrToMsg(T_W_C, &T_W_C_msg.transform);
+    // Converting the id to a message
+    std_msgs::UInt64 id;
+    id.data = pose_with_id.id;
+    // Pushing this onto the transform stamped array
+    // NOTE(alexmillane): Have stamped this with ros time now because 
+    //                    the GBA occurs asynchronously, so this seems
+    //                    like the best way to stamp this message.
+    transforms_with_ids.header.stamp = ros::Time::now();
+    transforms_with_ids.transforms.push_back(T_W_C_msg);
+    transforms_with_ids.keyframe_ids.push_back(id);
+  }
+  // Publishing the trajectory message
+  trajectory_pub_.publish(transforms_with_ids);
 }
 
 void OrbSlam2Interface::advertiseTopics() {
@@ -161,7 +178,7 @@ void OrbSlam2Interface::publishCurrentPoseAsTF(const ros::TimerEvent& event) {
       tf_transform, ros::Time::now(), frame_id_, child_frame_id_));
 }
 
-void OrbSlam2Interface::publishTrajectory(
+/*void OrbSlam2Interface::publishTrajectory(
     const std::vector<Eigen::Affine3d,
                       Eigen::aligned_allocator<Eigen::Affine3d>>&
         T_C_W_trajectory) {
@@ -179,7 +196,7 @@ void OrbSlam2Interface::publishTrajectory(
   }
   // Publishing
   trajectory_pub_.publish(pose_array_msg);
-}
+}*/
 
 void OrbSlam2Interface::convertOrbSlamPoseToKindr(const cv::Mat& T_cv,
                                                   Transformation* T_kindr) {

@@ -56,17 +56,20 @@ class OrbSlam2Interface {
                                     bool big_change_flag,
                                     const std_msgs::Header& frame_header);
 
-  void publishTrajectory(
+  // TODO(alex.millane): Depricated. Delete this.
+/*  void publishTrajectory(
       const std::vector<Eigen::Affine3d,
                         Eigen::aligned_allocator<Eigen::Affine3d> >&
-          trajectory);
+          trajectory);*/
 
   // Helper functions
   void convertOrbSlamPoseToKindr(const cv::Mat& T_cv, Transformation* T_kindr);
 
   // Contains a while loop that checks for updates to the past trajectories and
-  // then publishes them
-  void runPublishUpdatedTrajectory();
+  // then publishes them.
+  void runCheckForUpdatedTrajectory();
+  void publishUpdatedTrajectory(
+      const std::vector<ORB_SLAM2::PoseWithID>& T_C_W_trajectory);
 
   bool getMarginalUncertainty(int id, Eigen::MatrixXd* cov);
   bool getJointMarginalUncertainty(int id_x, int id_y, Eigen::MatrixXd* cov);
