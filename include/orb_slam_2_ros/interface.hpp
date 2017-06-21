@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include <std_srvs/Empty.h>
+
 #include <geometry_msgs/TransformStamped.h>
 #include <orb_slam_2/Optimizer.h>
 #include <orb_slam_2/System.h>
@@ -46,6 +48,10 @@ class OrbSlam2Interface {
   // Callbacks
   void imageCallback(const sensor_msgs::ImageConstPtr& msg);
 
+  // Service callbacks
+  bool startGlobalBundleAdjustmentCallback(std_srvs::Empty::Request& request,
+                                           std_srvs::Empty::Response& response);
+
   // Pose Publishing functions
   void publishCurrentPose(const Transformation& T,
                           const std_msgs::Header& header);
@@ -55,12 +61,6 @@ class OrbSlam2Interface {
                                     long unsigned int last_keyframe_id,
                                     bool big_change_flag,
                                     const std_msgs::Header& frame_header);
-
-  // TODO(alex.millane): Depricated. Delete this.
-/*  void publishTrajectory(
-      const std::vector<Eigen::Affine3d,
-                        Eigen::aligned_allocator<Eigen::Affine3d> >&
-          trajectory);*/
 
   // Helper functions
   void convertOrbSlamPoseToKindr(const cv::Mat& T_cv, Transformation* T_kindr);
@@ -84,6 +84,9 @@ class OrbSlam2Interface {
   ros::Timer tf_timer_;
   ros::Publisher trajectory_pub_;
   ros::Publisher keyframe_status_pub_;
+
+  // Services
+  ros::ServiceServer global_bundle_adjustment_srv_;
 
   // Pointer to the thread that checks for and publishes loop closures
   std::thread* mpt_loop_closure_publisher;

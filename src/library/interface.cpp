@@ -45,6 +45,44 @@ void OrbSlam2Interface::shutdown() {
   }
 }
 
+void OrbSlam2Interface::advertiseTopics() {
+  // Advertising topics
+  T_pub_ = nh_private_.advertise<geometry_msgs::TransformStamped>(
+      "transform_cam", 1);
+  trajectory_pub_ = nh_private_.advertise<orb_slam_2_ros::TransformsWithIds>(
+      "trajectory_cam", 1);
+  keyframe_status_pub_ = nh_private_.advertise<orb_slam_2_ros::KeyframeStatus>(
+      "keyframe_status", 1);
+  // Advertising services
+  global_bundle_adjustment_srv_ = nh_private_.advertiseService(
+      "start_global_bundle_adjustment",
+      &OrbSlam2Interface::startGlobalBundleAdjustmentCallback, this);
+  // Creating a callback timer for TF publisher
+  tf_timer_ = nh_.createTimer(ros::Duration(0.1),
+                              &OrbSlam2Interface::publishCurrentPoseAsTF, this);
+}
+
+void OrbSlam2Interface::getParametersFromRos() {
+  // Getting the paths to the files required by orb slam
+  CHECK(nh_private_.getParam("vocabulary_file_path", vocabulary_file_path_))
+      << "Please provide the vocabulary_file_path as a ros param.";
+  CHECK(nh_private_.getParam("settings_file_path", settings_file_path_))
+      << "Please provide the settings_file_path as a ros param.";
+  // Optional params
+  nh_private_.getParam("use_viewer", use_viewer_);
+  nh_private_.getParam("verbose", verbose_);
+  nh_private_.getParam("frame_id", frame_id_);
+  nh_private_.getParam("child_frame_id", child_frame_id_);
+}
+
+bool OrbSlam2Interface::startGlobalBundleAdjustmentCallback(
+    std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
+  // DEBUG
+  std::cout << "In the start global bundle adjustment service." << std::endl;
+  // Kicking off bundle adjustment
+  return slam_system_->startGlobalBundleAdjustment();
+}
+
 void OrbSlam2Interface::runCheckForUpdatedTrajectory() {
   // Looping while the interface is alive and checking for loop closures
   // TODO(alexmillane): Should be using condition variables really instead of
@@ -130,32 +168,6 @@ void OrbSlam2Interface::publishUpdatedTrajectory(
   trajectory_pub_.publish(transforms_with_ids);
 }
 
-void OrbSlam2Interface::advertiseTopics() {
-  // Advertising topics
-  T_pub_ = nh_private_.advertise<geometry_msgs::TransformStamped>(
-      "transform_cam", 1);
-  trajectory_pub_ = nh_private_.advertise<orb_slam_2_ros::TransformsWithIds>(
-      "trajectory_cam", 1);
-  keyframe_status_pub_ = nh_private_.advertise<orb_slam_2_ros::KeyframeStatus>(
-      "keyframe_status", 1);
-  // Creating a callback timer for TF publisher
-  tf_timer_ = nh_.createTimer(ros::Duration(0.1),
-                              &OrbSlam2Interface::publishCurrentPoseAsTF, this);
-}
-
-void OrbSlam2Interface::getParametersFromRos() {
-  // Getting the paths to the files required by orb slam
-  CHECK(nh_private_.getParam("vocabulary_file_path", vocabulary_file_path_))
-      << "Please provide the vocabulary_file_path as a ros param.";
-  CHECK(nh_private_.getParam("settings_file_path", settings_file_path_))
-      << "Please provide the settings_file_path as a ros param.";
-  // Optional params
-  nh_private_.getParam("use_viewer", use_viewer_);
-  nh_private_.getParam("verbose", verbose_);
-  nh_private_.getParam("frame_id", frame_id_);
-  nh_private_.getParam("child_frame_id", child_frame_id_);
-}
-
 void OrbSlam2Interface::publishCurrentPose(const Transformation& T,
                                            const std_msgs::Header& header) {
   // Creating the message
@@ -177,26 +189,6 @@ void OrbSlam2Interface::publishCurrentPoseAsTF(const ros::TimerEvent& event) {
   tf_broadcaster_.sendTransform(tf::StampedTransform(
       tf_transform, ros::Time::now(), frame_id_, child_frame_id_));
 }
-
-/*void OrbSlam2Interface::publishTrajectory(
-    const std::vector<Eigen::Affine3d,
-                      Eigen::aligned_allocator<Eigen::Affine3d>>&
-        T_C_W_trajectory) {
-  // Populating the pose array
-  geometry_msgs::PoseArray pose_array_msg;
-  for (size_t pose_idx = 0; pose_idx < T_C_W_trajectory.size(); pose_idx++) {
-    Eigen::Affine3d T_C_W = T_C_W_trajectory[pose_idx];
-    // TODO(alexmillane): This is the wrong place for the inverse. Move it to
-    // the extraction function... Also rename the publisher. Gotta go to bed
-    // right now.
-    Eigen::Affine3d T_W_C = T_C_W.inverse();
-    geometry_msgs::Pose pose_msg;
-    tf::poseEigenToMsg(T_W_C, pose_msg);
-    pose_array_msg.poses.push_back(pose_msg);
-  }
-  // Publishing
-  trajectory_pub_.publish(pose_array_msg);
-}*/
 
 void OrbSlam2Interface::convertOrbSlamPoseToKindr(const cv::Mat& T_cv,
                                                   Transformation* T_kindr) {
