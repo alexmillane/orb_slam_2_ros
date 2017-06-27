@@ -51,6 +51,8 @@ void OrbSlam2InterfaceStereo::stereoImageCallback(
   // Publishing results
   publishCurrentPose(T_W_C_, msg_left->header);
   publishCurrentKeyframeStatus(keyframe_flag, last_keyframe_id, big_change_flag, msg_left->header);
+  //Publishing visualization
+  publishCurrentPoseVisualization(T_W_C_, keyframe_flag);
 }
 
 void OrbSlam2InterfaceStereo::performTracking(

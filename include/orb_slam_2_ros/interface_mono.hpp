@@ -1,5 +1,5 @@
-#ifndef ORB_SLAM_2_INTERFACE_MONO
-#define ORB_SLAM_2_INTERFACE_MONO
+#ifndef ORB_SLAM_2_ROS_INTERFACE_MONO_H_
+#define ORB_SLAM_2_ROS_INTERFACE_MONO_H_
 
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
@@ -29,4 +29,4 @@ class OrbSlam2InterfaceMono : public OrbSlam2Interface {
 
 }  // namespace orb_slam_2_interface
 
-#endif /* ORB_SLAM_2_INTERFACE_MONO */
+#endif /* ORB_SLAM_2_ROS_INTERFACE_MONO _H_*/

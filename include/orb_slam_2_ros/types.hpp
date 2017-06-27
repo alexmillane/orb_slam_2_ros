@@ -1,5 +1,5 @@
-#ifndef ORB_SLAM_2_TYPES
-#define ORB_SLAM_2_TYPES
+#ifndef ORB_SLAM_2_ROS_TYPES_H_
+#define ORB_SLAM_2_ROS_TYPES_H_
 
 #include <kindr/minimal/quat-transformation.h>
 #include <kindr/minimal/rotation-quaternion.h>
@@ -12,4 +12,4 @@ typedef kindr::minimal::RotationQuaternion Quaternion;
 
 }  // namespace orb_slam_2_interface
 
-#endif /* ORB_SLAM_2_TYPES */
+#endif /* ORB_SLAM_2_ROS_TYPES_H_ */

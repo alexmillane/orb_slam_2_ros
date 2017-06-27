@@ -1,5 +1,5 @@
-#ifndef ORB_SLAM_2_INTERFACE
-#define ORB_SLAM_2_INTERFACE
+#ifndef ORB_SLAM_2_ROS_INTERFACE_H_
+#define ORB_SLAM_2_ROS_INTERFACE_H_
 
 #include <memory>
 #include <mutex>
@@ -52,24 +52,30 @@ class OrbSlam2Interface {
   bool startGlobalBundleAdjustmentCallback(std_srvs::Empty::Request& request,
                                            std_srvs::Empty::Response& response);
 
+  // Contains a while loop that checks for updates to the past trajectories and
+  // then publishes them.
+  void runCheckForUpdatedTrajectory();
+
   // Pose Publishing functions
   void publishCurrentPose(const Transformation& T,
                           const std_msgs::Header& header);
   void publishCurrentPoseAsTF(const ros::TimerEvent& event);
-
   void publishCurrentKeyframeStatus(bool keyframe_status,
                                     long unsigned int last_keyframe_id,
                                     bool big_change_flag,
                                     const std_msgs::Header& frame_header);
+  void publishUpdatedTrajectory(
+      const std::vector<ORB_SLAM2::PoseWithID>& T_C_W_trajectory);
+
+
+  // Visualization functions
+  void publishCurrentPoseVisualization(const Transformation& T,
+                                       bool keyframe_flag);
+  void publishUpdatedTrajectoryVisualization(
+      const std::vector<ORB_SLAM2::PoseWithID>& T_C_W_trajectory);
 
   // Helper functions
   void convertOrbSlamPoseToKindr(const cv::Mat& T_cv, Transformation* T_kindr);
-
-  // Contains a while loop that checks for updates to the past trajectories and
-  // then publishes them.
-  void runCheckForUpdatedTrajectory();
-  void publishUpdatedTrajectory(
-      const std::vector<ORB_SLAM2::PoseWithID>& T_C_W_trajectory);
 
   bool getMarginalUncertainty(int id, Eigen::MatrixXd* cov);
   bool getJointMarginalUncertainty(int id_x, int id_y, Eigen::MatrixXd* cov);
@@ -84,6 +90,8 @@ class OrbSlam2Interface {
   ros::Timer tf_timer_;
   ros::Publisher trajectory_pub_;
   ros::Publisher keyframe_status_pub_;
+  ros::Publisher frame_visualization_pub_;
+  ros::Publisher optimized_frame_visualization_pub_;
 
   // Services
   ros::ServiceServer global_bundle_adjustment_srv_;
@@ -114,6 +122,9 @@ class OrbSlam2Interface {
   std::string frame_id_;
   std::string child_frame_id_;
 
+  // A counter for the number of published frame markers
+  size_t frame_marker_counter_;
+
   // Signaling members
   std::mutex m_mutex_shutdown_flag;
   bool mb_shutdown_flag;
@@ -121,4 +132,4 @@ class OrbSlam2Interface {
 
 }  // namespace orb_slam_2_interface
 
-#endif /* ORB_SLAM_2_INTERFACE */
+#endif /* ORB_SLAM_2_ROS_INTERFACE_H_ */

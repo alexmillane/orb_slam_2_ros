@@ -1,5 +1,5 @@
-#ifndef ORB_SLAM_2_INTERFACE_STEREO
-#define ORB_SLAM_2_INTERFACE_STEREO
+#ifndef ORB_SLAM_2_ROS_INTERFACE_STEREO_H_
+#define ORB_SLAM_2_ROS_INTERFACE_STEREO_H_
 
 #include <cv_bridge/cv_bridge.h>
 #include <ros/ros.h>
@@ -52,4 +52,4 @@ class OrbSlam2InterfaceStereo : public OrbSlam2Interface {
 
 }  // namespace orb_slam_2_interface
 
-#endif /* ORB_SLAM_2_INTERFACE_STEREO */
+#endif /* ORB_SLAM_2_ROS_INTERFACE_STEREO_H_ */

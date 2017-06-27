@@ -6,13 +6,14 @@ add_definitions(-std=c++11)
 find_package(catkin_simple REQUIRED)
 catkin_simple(ALL_DEPS_REQUIRED)
 
-find_package(Eigen REQUIRED)
+find_package(Eigen3 REQUIRED)
 include_directories(${Eigen_INCLUDE_DIRS})
 
 cs_add_library(orb_slam_2_interface
   src/library/interface.cpp
   src/library/interface_mono.cpp
   src/library/interface_stereo.cpp
+  src/library/visualization.cpp
 )
 
 cs_add_executable(orb_slam_2_ros_node

@@ -18,6 +18,7 @@
 
 #include "orb_slam_2_ros/TransformsWithIds.h"
 #include "orb_slam_2_ros/interface.hpp"
+#include "orb_slam_2_ros/visualization.hpp"
 
 namespace orb_slam_2_interface {
 
@@ -29,7 +30,8 @@ OrbSlam2Interface::OrbSlam2Interface(const ros::NodeHandle& nh,
       verbose_(kDefaultVerbose),
       frame_id_(kDefaultFrameId),
       child_frame_id_(kDefaultChildFrameId),
-      mb_shutdown_flag(false) {
+      mb_shutdown_flag(false),
+      frame_marker_counter_(0) {
   // Getting data and params
   advertiseTopics();
   getParametersFromRos();
@@ -53,6 +55,13 @@ void OrbSlam2Interface::advertiseTopics() {
       "trajectory_cam", 1);
   keyframe_status_pub_ = nh_private_.advertise<orb_slam_2_ros::KeyframeStatus>(
       "keyframe_status", 1);
+  // Advertising the visualization topics
+  frame_visualization_pub_ =
+      nh_private_.advertise<visualization_msgs::MarkerArray>(
+          "frame_visualization", 1, true);
+  optimized_frame_visualization_pub_ =
+      nh_private_.advertise<visualization_msgs::MarkerArray>(
+          "optimized_frame_visualization", 1, true);
   // Advertising services
   global_bundle_adjustment_srv_ = nh_private_.advertiseService(
       "start_global_bundle_adjustment",
@@ -104,7 +113,8 @@ void OrbSlam2Interface::runCheckForUpdatedTrajectory() {
 
       // Publishing the trajectory
       publishUpdatedTrajectory(T_C_W_trajectory_unnormalized);
-
+      // Publishing the optimized trajectory
+      publishUpdatedTrajectoryVisualization(T_C_W_trajectory_unnormalized);
 
       // BELOW IS ZACH'S STUFF ON CALCULATING THE MARGINAL COVARIANCE.
       // THIS NEEDS MORE WORK.
@@ -224,7 +234,71 @@ void OrbSlam2Interface::publishCurrentKeyframeStatus(
   keyframe_status_pub_.publish(keyframe_status_msg);
 }
 
-bool OrbSlam2Interface::getMarginalUncertainty(int id, Eigen::MatrixXd* cov) {
+void OrbSlam2Interface::publishCurrentPoseVisualization(const Transformation& T,
+                                                        bool keyframe_flag) {
+  // The frame type
+  visualization::FrameType frame_type;
+  if (keyframe_flag == true) {
+    frame_type = visualization::FrameType::KeyFrame;
+  } else {
+    frame_type = visualization::FrameType::Frame;
+  }
+  // Getting the marker array
+  visualization_msgs::MarkerArray marker_array;
+  visualization::addFrameToMarkerArray(T, frame_id_, frame_type,
+                                       &marker_array, &frame_marker_counter_);
+  // Publishing
+  frame_visualization_pub_.publish(marker_array);
+}
+
+void OrbSlam2Interface::publishUpdatedTrajectoryVisualization(
+    const std::vector<ORB_SLAM2::PoseWithID>& T_C_W_trajectory) {
+
+  // DEBUG
+  std::cout << "Publishing the optimized trajectory visualizations" << std::endl;
+
+  // Looping over the new keyframe positions and publishing the visualizations
+  visualization_msgs::MarkerArray marker_array;
+  size_t optimized_frame_marker_counter = 0;
+  static const std::string ns = "optimized_keyframe";
+  static const auto frame_type = visualization::FrameType::OptimizedKeyFrame;
+  for (const ORB_SLAM2::PoseWithID& pose_with_id : T_C_W_trajectory) {
+    // Converting to minkindr
+    Transformation T_C_W;
+    convertOrbSlamPoseToKindr(pose_with_id.pose, &T_C_W);
+    // Inverting for the proper direction
+    Transformation T_W_C = T_C_W.inverse();
+    // Getting the marker array
+    visualization::addFrameToMarkerArray(T_W_C, frame_id_, frame_type,
+                                         &marker_array,
+                                         &optimized_frame_marker_counter);
+    // Adding the covariances if available
+    if (pose_with_id.covarianceValid) {
+      // Getting the position covariance
+      Eigen::Matrix3d position_covariance = pose_with_id.covariance.block<3,3>(3,3);
+
+      // DEBUG
+      std::cout << "position_covariance: " << position_covariance << std::endl;
+
+      //Eigen::Matrix3d position_covariance = Eigen::Matrix3d::Identity();
+      // Adding this to the marker array
+      visualization::addCovarianceEllipseToMarkerArray(
+          T_W_C, position_covariance, frame_id_, &marker_array,
+          &optimized_frame_marker_counter);
+    }
+  }
+
+  // Publishing
+  optimized_frame_visualization_pub_.publish(marker_array);
+}
+
+/******************************
+ * Note(alex.millane)
+ * Below is Zach's hackery to get the marginal uncertainty
+ * leave in for now as it might be useful.
+ ******************************/
+
+/*bool OrbSlam2Interface::getMarginalUncertainty(int id, Eigen::MatrixXd* cov) {
   if (idToIdx_.find(id) == idToIdx_.end()) {
     return false;
   }
@@ -235,10 +309,10 @@ bool OrbSlam2Interface::getMarginalUncertainty(int id, Eigen::MatrixXd* cov) {
 
   return true;
 }
-
+*/
 // I have no idea if this is correct, a straight implementation of this
 // wikipedia page (https://en.wikipedia.org/wiki/Schur_complement)
-bool OrbSlam2Interface::getJointMarginalUncertainty(int id_x, int id_y,
+/*bool OrbSlam2Interface::getJointMarginalUncertainty(int id_x, int id_y,
                                                     Eigen::MatrixXd* cov) {
   if (idToIdx_.find(id_x) == idToIdx_.end()) {
     return false;
@@ -260,5 +334,5 @@ bool OrbSlam2Interface::getJointMarginalUncertainty(int id_x, int id_y,
 
   return true;
 }
-
+*/
 }  // namespace orb_slam_2_interface
