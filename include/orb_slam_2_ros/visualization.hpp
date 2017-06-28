@@ -37,7 +37,7 @@ constexpr double kOptimizedKeyframeColors[3][3] = {
 
 constexpr double kCovarianceColor[3] = {255, 255, 0};  // redish
 constexpr double kCovarianceAlpha = 0.5;
-constexpr double kCovarianceScale = 25;
+constexpr double kCovarianceScale = 5;
 
 enum class FrameType { Frame, KeyFrame, OptimizedKeyFrame };
 

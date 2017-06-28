@@ -278,7 +278,7 @@ void OrbSlam2Interface::publishUpdatedTrajectoryVisualization(
       Eigen::Matrix3d position_covariance = pose_with_id.covariance.block<3,3>(3,3);
 
       // DEBUG
-      std::cout << "position_covariance: " << position_covariance << std::endl;
+      //std::cout << "position_covariance: " << position_covariance << std::endl;
 
       //Eigen::Matrix3d position_covariance = Eigen::Matrix3d::Identity();
       // Adding this to the marker array
