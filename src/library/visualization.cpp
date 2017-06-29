@@ -137,10 +137,10 @@ void addCovarianceEllipseToMarkerArray(
 void drawCovariance3D(const Eigen::Vector3d& mu, const Eigen::Matrix3d& cov,
                       const std_msgs::ColorRGBA& color, double n_sigma,
                       visualization_msgs::Marker* marker) {
-  // TODO(helenol): What does this do???? Does anyone know?
-  const Eigen::Matrix3d changed_covariance = (cov + cov.transpose()) * 0.5;
+  // This operation just guaruntees the matrix is self adjoint
+  const Eigen::Matrix3d covariance_self_adjoint = (cov + cov.transpose()) * 0.5;
   Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver(
-      changed_covariance, Eigen::ComputeEigenvectors);
+      covariance_self_adjoint, Eigen::ComputeEigenvectors);
   Eigen::Matrix3d V = solver.eigenvectors();
   // make sure it's a rotation matrix
   V.col(2) = V.col(0).cross(V.col(1));

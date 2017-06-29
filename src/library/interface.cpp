@@ -275,15 +275,15 @@ void OrbSlam2Interface::publishUpdatedTrajectoryVisualization(
     // Adding the covariances if available
     if (pose_with_id.covarianceValid) {
       // Getting the position covariance
-      Eigen::Matrix3d position_covariance = pose_with_id.covariance.block<3,3>(3,3);
-
-      // DEBUG
-      //std::cout << "position_covariance: " << position_covariance << std::endl;
-
-      //Eigen::Matrix3d position_covariance = Eigen::Matrix3d::Identity();
+      Eigen::Matrix3d position_covariance_C =
+          pose_with_id.covariance.block<3, 3>(3, 3);
+      // Rotating the covariance into the world frame for display
+      Eigen::Matrix3d position_covariance_W =
+          T_W_C.getRotationMatrix() * position_covariance_C *
+          T_W_C.getRotationMatrix().transpose();
       // Adding this to the marker array
       visualization::addCovarianceEllipseToMarkerArray(
-          T_W_C, position_covariance, frame_id_, &marker_array,
+          T_W_C, position_covariance_W, frame_id_, &marker_array,
           &optimized_frame_marker_counter);
     }
   }
