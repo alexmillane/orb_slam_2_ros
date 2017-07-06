@@ -17,6 +17,10 @@ constexpr double kAxesScale = 1.0;
 constexpr double kAxesDiameter = 0.5;
 constexpr double kAxesAlpha = 1.0;
 
+constexpr double kPatchAxesScale =3.0;
+constexpr double kPatchAxesDiameter = 1.0;
+constexpr double kPatchAxesAlpha = 1.0;
+
 constexpr double kKeyframeColors[3][3] = {
     {1, 0, 0},  // red
     {0, 1, 0},  // blue
@@ -35,11 +39,22 @@ constexpr double kOptimizedKeyframeColors[3][3] = {
     {255, 0, 255}   // greenish
 };
 
-constexpr double kCovarianceColor[3] = {255, 255, 0};  // redish
-constexpr double kCovarianceAlpha = 0.5;
-constexpr double kCovarianceScale = 5;
+constexpr double kOptimizedPatchframeColors[3][3] = {
+    {255, 255, 0},  // redish
+    {0, 255, 255},  // blueish
+    {255, 0, 255}   // greenish
+};
 
-enum class FrameType { Frame, KeyFrame, OptimizedKeyFrame };
+constexpr double kKeyframeCovarianceColor[3] = {255, 255, 0};
+constexpr double kKeyframeCovarianceAlpha = 0.25;
+constexpr double kKeyframeCovarianceScale = 5;
+
+constexpr double kPatchCovarianceColor[3] = {0, 255, 255};
+constexpr double kPatchCovarianceAlpha = 0.5;
+constexpr double kPatchCovarianceScale = 25;
+
+enum class FrameType { Frame, KeyFrame, OptimizedKeyFrame, OptimizedPatchFrame };
+enum class CovarianceType { OptimizedKeyFrame, OptimizedPatchFrame };
 
 void addFrameToMarkerArray(const Transformation& T_M_C,
                            const std::string& frame,
@@ -62,7 +77,8 @@ void drawAxesArrowsWithColor(const Eigen::Vector3d& p,
 
 void addCovarianceEllipseToMarkerArray(
     const Transformation& T_M_C, const Eigen::Matrix3d& covariance,
-    const std::string& frame, visualization_msgs::MarkerArray* marker_array_ptr,
+    const std::string& frame, const CovarianceType& covariance_type,
+    visualization_msgs::MarkerArray* marker_array_ptr,
     size_t* axes_marker_index_ptr);
 
 /**
@@ -73,8 +89,13 @@ void addCovarianceEllipseToMarkerArray(
  * \param[in] color RGBA color of the ellipsoid
  * \param[in] n_sigma confidence area / scale of the ellipsoid
  */
-void drawCovariance3D(const Eigen::Vector3d& mu, const Eigen::Matrix3d& cov,
+/*void drawCovariance3D(const Eigen::Vector3d& mu, const Eigen::Matrix3d& cov,
                       const std_msgs::ColorRGBA& color, double n_sigma,
+                      visualization_msgs::Marker* marker);
+*/
+
+void drawCovariance3D(const Eigen::Vector3d& mu, const Eigen::Matrix3d& cov,
+                      const double colors[3], double alpha, double n_sigma,
                       visualization_msgs::Marker* marker);
 
 }  // namespace visualization

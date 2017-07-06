@@ -15,10 +15,12 @@
 #include "orb_slam_2_ros/TransformsWithIds.h"
 
 #include <Eigen/Sparse>
+#include <Eigen/StdVector>
 
 #include "orb_slam_2_ros/TransformsWithIds.h"
 #include "orb_slam_2_ros/interface.hpp"
 #include "orb_slam_2_ros/visualization.hpp"
+#include "orb_slam_2_ros/matrix_io.hpp"
 
 namespace orb_slam_2_interface {
 
@@ -277,62 +279,107 @@ void OrbSlam2Interface::publishUpdatedTrajectoryVisualization(
       // Getting the position covariance
       Eigen::Matrix3d position_covariance_C =
           pose_with_id.covariance.block<3, 3>(3, 3);
-      // Rotating the covariance into the world frame for display
-      Eigen::Matrix3d position_covariance_W =
-          T_W_C.getRotationMatrix() * position_covariance_C *
-          T_W_C.getRotationMatrix().transpose();
       // Adding this to the marker array
+      static const auto covariance_type = visualization::CovarianceType::OptimizedKeyFrame;
       visualization::addCovarianceEllipseToMarkerArray(
-          T_W_C, position_covariance_W, frame_id_, &marker_array,
-          &optimized_frame_marker_counter);
+          T_W_C, position_covariance_C, frame_id_, covariance_type,
+          &marker_array, &optimized_frame_marker_counter);
     }
+  }
+
+  // Publishing the patch base frames 
+  constexpr bool publishPatchBaseFramesVisualizations = true;
+  if (publishPatchBaseFramesVisualizations) {
+
+    // THIS IS JUST TEMPORARY TESTING OF THE MARGINAL COVARIANCE FUNCTIONS.
+    // ADDING ARBITRARILY PATCH BASE FRAMES
+    {
+      // Clearing the keyframes
+      slam_system_->removeAllKeyframesAsPatchBaseFrames();
+
+      // Adding some test base frames.
+      std::vector<unsigned long> keyframe_ids;
+      slam_system_->getCurrentKeyframeIds(&keyframe_ids);
+
+      // FOR TESTING
+      // Adding every 10th keyframe as a patch base frame
+      constexpr int kfs_per_patch = 10;
+      for (size_t KFidx = 0; KFidx < keyframe_ids.size();
+           KFidx += kfs_per_patch) {
+        slam_system_->addKeyframeAsPatchBaseframe(keyframe_ids[KFidx]);
+      }
+    }
+
+    // Getting patch poses and covariances
+    std::vector<cv::Mat> patch_poses;
+    std::vector<Eigen::Matrix<double, 6, 6>,
+                Eigen::aligned_allocator<Eigen::Matrix<double, 6, 6>>>
+        patch_conditional_covariances;
+    slam_system_->getPatchBaseFramePosesAndCovariances(
+        &patch_poses, &patch_conditional_covariances);
+
+    // DEBUG
+    std::cout << "patch_poses.size(): " << patch_poses.size() << std::endl;
+    std::cout << "patch_conditional_covariances.size(): "
+              << patch_conditional_covariances.size() << std::endl;
+
+    // Visualizing the patch base frames
+    static const std::string ns = "optimized_patchframes";
+    static const auto frame_type =
+        visualization::FrameType::OptimizedPatchFrame;
+    // for (const cv::Mat& patch_pose : patch_poses) {
+    for (size_t patch_idx = 0; patch_idx < patch_poses.size(); patch_idx++) {
+      // Getting the pose
+      const cv::Mat patch_pose = patch_poses[patch_idx];
+      // Converting to minkindr
+      Transformation T_P_W;
+      convertOrbSlamPoseToKindr(patch_pose, &T_P_W);
+      // Inverting for the proper direction
+      Transformation T_W_P = T_P_W.inverse();
+      // Getting the marker array
+      visualization::addFrameToMarkerArray(T_W_P, frame_id_, frame_type,
+                                           &marker_array,
+                                           &optimized_frame_marker_counter);
+      // NOTE(alexmillane): The reason we start at patch 2
+      // First patch:   Does not have a conditional covariance
+      // Second patch:  The conditional covariance appears to be numerically
+      //                unstable because the covariance of the first keyframe is tiny.
+      if (patch_idx > 1) {
+        // DEBUG
+        std::cout << "marginal ovariance of patch: " << patch_idx << std::endl
+                  << patch_conditional_covariances[patch_idx - 1] << std::endl;
+
+        // Getting the position covariance
+        Eigen::Matrix3d patch_position_covariance_C =
+            patch_conditional_covariances[patch_idx - 1].block<3, 3>(3, 3);
+        // Adding this to the marker array
+        static const auto covariance_type =
+            visualization::CovarianceType::OptimizedPatchFrame;
+        visualization::addCovarianceEllipseToMarkerArray(
+            T_W_P, patch_position_covariance_C, frame_id_, covariance_type,
+            &marker_array, &optimized_frame_marker_counter);
+      }
+    }
+
+    // Combine the conditional covariances to a single matrix for output
+    std::cout << "Saving the combined conditional covariance matrix to file"
+              << std::endl;
+    Eigen::MatrixXd combined_coditional_covariance((patch_poses.size() - 2) * 6,
+                                                   6);
+    for (size_t patch_idx = 2; patch_idx < patch_poses.size(); patch_idx++) {
+      combined_coditional_covariance.block<6, 6>((patch_idx - 2) * 6, 0) =
+          patch_conditional_covariances[patch_idx - 1];
+    }
+    // Saving the conditional covariances as a single matrix
+    static const std::string combined_conditional_covariance_file_path =
+        "/home/millanea/trunk/manifold_mapping_analysis/data/orb_slam/"
+        "covariance/combined_conditional_covariances";
+    io::writeMatlab(combined_conditional_covariance_file_path.c_str(),
+                    combined_coditional_covariance);
   }
 
   // Publishing
   optimized_frame_visualization_pub_.publish(marker_array);
 }
 
-/******************************
- * Note(alex.millane)
- * Below is Zach's hackery to get the marginal uncertainty
- * leave in for now as it might be useful.
- ******************************/
-
-/*bool OrbSlam2Interface::getMarginalUncertainty(int id, Eigen::MatrixXd* cov) {
-  if (idToIdx_.find(id) == idToIdx_.end()) {
-    return false;
-  }
-  int idx = idToIdx_[id];
-
-  // get elements
-  *cov = cov_mat_.block(idx * 6, idx * 6, 6, 6);
-
-  return true;
-}
-*/
-// I have no idea if this is correct, a straight implementation of this
-// wikipedia page (https://en.wikipedia.org/wiki/Schur_complement)
-/*bool OrbSlam2Interface::getJointMarginalUncertainty(int id_x, int id_y,
-                                                    Eigen::MatrixXd* cov) {
-  if (idToIdx_.find(id_x) == idToIdx_.end()) {
-    return false;
-  }
-  int idx_x = idToIdx_[id_x];
-
-  if (idToIdx_.find(id_y) == idToIdx_.end()) {
-    return false;
-  }
-  int idx_y = idToIdx_[id_y];
-
-  // get parts of shur matrix
-  Eigen::Matrix<double, 6, 6> A = cov_mat_.block(idx_x * 6, idx_x * 6, 6, 6);
-  Eigen::Matrix<double, 6, 6> B = cov_mat_.block(idx_x * 6, idx_y * 6, 6, 6);
-  Eigen::Matrix<double, 6, 6> C = cov_mat_.block(idx_y * 6, idx_y * 6, 6, 6);
-
-  // get covariance
-  *cov = A - B * C.inverse() * B.transpose();
-
-  return true;
-}
-*/
 }  // namespace orb_slam_2_interface

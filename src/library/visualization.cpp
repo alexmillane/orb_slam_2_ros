@@ -39,6 +39,13 @@ void addFrameToMarkerArray(const Transformation& T_M_C,
                               kOptimizedKeyframeColors, kAxesAlpha, &markers);
       ns = "optimized_keyframe";
       break;
+    case FrameType::OptimizedPatchFrame:
+      drawAxesArrowsWithColor(T_M_C.getPosition(), T_M_C.getEigenQuaternion(),
+                              kPatchAxesScale, kPatchAxesDiameter,
+                              kOptimizedPatchframeColors, kPatchAxesAlpha,
+                              &markers);
+      ns = "optimized_patchframe";
+      break;
   }
   // Setting the marker frames
   size_t marker_counter = 0;
@@ -112,22 +119,36 @@ void drawAxesArrowsWithColor(const Eigen::Vector3d& p,
 }
 
 void addCovarianceEllipseToMarkerArray(
-    const Transformation& T_M_C, const Eigen::Matrix3d& covariance,
-    const std::string& frame, visualization_msgs::MarkerArray* marker_array_ptr,
+    const Transformation& T_M_C, const Eigen::Matrix3d& covariance_C,
+    const std::string& frame, const CovarianceType& covariance_type,
+    visualization_msgs::MarkerArray* marker_array_ptr,
     size_t* axes_marker_index_ptr) {
   // Argument checks
   CHECK_NOTNULL(marker_array_ptr);
   CHECK_NOTNULL(axes_marker_index_ptr);
-  // Marker
+
+  // Rotating the covariance into the world frame for display
+  Eigen::Matrix3d covariance_W = T_M_C.getRotationMatrix() * covariance_C *
+                                 T_M_C.getRotationMatrix().transpose();
+
+  // Getting the markers for the axes
   visualization_msgs::Marker marker;
-  // Filling the marker
-  drawCovariance3D(T_M_C.getPosition(), covariance,
-                   createColorRGBA(kCovarianceColor[0], kCovarianceColor[1],
-                                   kCovarianceColor[2], kCovarianceAlpha),
-                   kCovarianceScale, &marker);
+  std::string ns;
+  switch (covariance_type) {
+    case CovarianceType::OptimizedKeyFrame:
+      drawCovariance3D(T_M_C.getPosition(), covariance_W,
+                       kKeyframeCovarianceColor, kKeyframeCovarianceAlpha,
+                       kKeyframeCovarianceScale, &marker);
+      ns = "covariance_keyframe";
+      break;
+    case CovarianceType::OptimizedPatchFrame:
+      drawCovariance3D(T_M_C.getPosition(), covariance_W, kPatchCovarianceColor,
+                       kPatchCovarianceAlpha, kPatchCovarianceScale, &marker);
+      ns = "covariance_patch";
+  }
   // Filling out the other fields
   marker.header.frame_id = frame;
-  marker.ns = "covariance";
+  marker.ns = ns;
   marker.id = *axes_marker_index_ptr;
   // Pushing onto the array
   marker_array_ptr->markers.push_back(marker);
@@ -135,8 +156,10 @@ void addCovarianceEllipseToMarkerArray(
 }
 
 void drawCovariance3D(const Eigen::Vector3d& mu, const Eigen::Matrix3d& cov,
-                      const std_msgs::ColorRGBA& color, double n_sigma,
+                      const double colors[3], double alpha, double n_sigma,
                       visualization_msgs::Marker* marker) {
+  // Adding easier color stuff
+  const std_msgs::ColorRGBA color = createColorRGBA(colors[0], colors[1], colors[2], alpha);
   // This operation just guaruntees the matrix is self adjoint
   const Eigen::Matrix3d covariance_self_adjoint = (cov + cov.transpose()) * 0.5;
   Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> solver(
